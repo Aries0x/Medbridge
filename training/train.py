@@ -23,13 +23,12 @@ Usage:
 # **Model**: Qwen2.5-3B-Instruct (via Unsloth 4-bit QLoRA)
 # **Hardware**: T4 GPU (16GB VRAM)
 
-# %% Install dependencies
+# %% Install dependencies (run each line as a separate cell if needed)
 # !pip install -q "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"
-# !pip install -q --no-deps "trl>=0.12.0"
-# !pip install -q --no-deps mergekit  # TRL GRPO needs this at import time
-# !pip install -q openenv-core datasets accelerate bitsandbytes wandb "transformers>=4.45.0" peft sentencepiece
-# !pip install -q textstat langdetect  # For local reward calculation
-# !pip install -q git+https://github.com/Aries0x/Medbridge.git  # MedBridge client + rewards
+# !pip install -q --no-deps "trl>=0.12.0" mergekit
+# !pip install -q openenv-core datasets accelerate bitsandbytes wandb "transformers>=4.45.0" peft sentencepiece textstat langdetect
+# !pip install -q git+https://github.com/Aries0x/Medbridge.git
+# !pip install -q --upgrade "pydantic>=2.12.0"  # Restore Colab pydantic — eliminates ALL warnings
 
 # %% Imports
 import os
