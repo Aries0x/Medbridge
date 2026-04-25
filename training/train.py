@@ -115,40 +115,40 @@ def generate_training_prompts(n_prompts: int = 200) -> Dataset:
         
         # The observation contains metadata from the server
         metadata = obs.metadata or {}
-            patient_dict = metadata.get("current_patient", {})
-            report_dict = metadata.get("current_report", {})
+        patient_dict = metadata.get("current_patient", {})
+        report_dict = metadata.get("current_report", {})
 
-            system_msg = (
-                "You are a compassionate medical communicator in India. "
-                "Explain medical diagnoses simply and empathetically in the patient's language."
-            )
+        system_msg = (
+            "You are a compassionate medical communicator in India. "
+            "Explain medical diagnoses simply and empathetically in the patient's language."
+        )
 
-            user_msg = (
-                f"Patient: {patient_dict.get('name')}, Age: {patient_dict.get('age')}, "
-                f"Language: {patient_dict.get('language')}, "
-                f"Education: {patient_dict.get('education_level')}\n\n"
-                f"Medical Report:\n{obs.medical_report}\n\n"
-                f"Diagnosis: {obs.diagnosis_name}\n\n"
-                f"Please explain this to the patient in {patient_dict.get('language')}."
-            )
+        user_msg = (
+            f"Patient: {patient_dict.get('name')}, Age: {patient_dict.get('age')}, "
+            f"Language: {patient_dict.get('language')}, "
+            f"Education: {patient_dict.get('education_level')}\n\n"
+            f"Medical Report:\n{obs.medical_report}\n\n"
+            f"Diagnosis: {obs.diagnosis_name}\n\n"
+            f"Please explain this to the patient in {patient_dict.get('language')}."
+        )
 
-            prompt = tokenizer.apply_chat_template(
-                [
-                    {"role": "system", "content": system_msg},
-                    {"role": "user", "content": user_msg},
-                ],
-                tokenize=False,
-                add_generation_prompt=True,
-            )
+        prompt = tokenizer.apply_chat_template(
+            [
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": user_msg},
+            ],
+            tokenize=False,
+            add_generation_prompt=True,
+        )
 
-            prompts.append({
-                "prompt": prompt,
-                "patient_dict": json.dumps(patient_dict),
-                "report_dict": json.dumps(report_dict),
-            })
+        prompts.append({
+            "prompt": prompt,
+            "patient_dict": json.dumps(patient_dict),
+            "report_dict": json.dumps(report_dict),
+        })
 
-            if (i + 1) % 50 == 0:
-                print(f"Generated {i+1}/{n_prompts} prompts")
+        if (i + 1) % 50 == 0:
+            print(f"Generated {i+1}/{n_prompts} prompts")
 
     return Dataset.from_list(prompts)
 
@@ -247,8 +247,8 @@ def medbridge_reward_combined(completions: List[str], **kwargs) -> List[float]:
             ))
 
             rewards.append(obs.reward or 0.0)
-            except Exception:
-                rewards.append(0.0)
+        except Exception:
+            rewards.append(0.0)
 
     return rewards
 
