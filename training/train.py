@@ -24,8 +24,11 @@ Usage:
 # **Hardware**: T4 GPU (16GB VRAM)
 
 # %% Install dependencies
-# !pip install -q unsloth openenv-core datasets accelerate bitsandbytes wandb
-# !pip install -U "trl>=0.12.0" "transformers>=4.45.0" "mergekit" "llm_blender"
+# !pip install -q "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"
+# !pip install -q --no-deps "trl>=0.12.0"
+# !pip install -q openenv-core datasets accelerate bitsandbytes wandb "transformers>=4.45.0" "peft" "sentencepiece"
+# # mergekit and llm-blender are optional but sometimes imported by TRL GRPO
+# !pip install -q "mergekit" "llm-blender"
 
 # %% Imports
 import os
