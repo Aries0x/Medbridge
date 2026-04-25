@@ -162,51 +162,59 @@ print(f"Created dataset with {len(train_dataset)} prompts")
 # %% Metadata-aware Reward Functions
 # These rewards use local imports for speed and metadata for accuracy.
 
-def reward_accuracy(completions, report_dict, **kwargs):
+def reward_accuracy(prompts, completions, **kwargs):
     """Checks medical accuracy against the CORRECT diagnosis."""
+    report_dict = kwargs.get("report_dict", [])
     rewards = []
     for completion, report_json in zip(completions, report_dict):
         try:
             report = json.loads(report_json)
             score = score_accuracy(completion, report)
             rewards.append(score)
-        except Exception:
+        except Exception as e:
+            print(f"Accuracy Error: {e}")
             rewards.append(0.0)
     return rewards
 
-def reward_simplicity(completions, patient_dict, **kwargs):
+def reward_simplicity(prompts, completions, **kwargs):
     """Checks reading level against patient's target grade."""
+    patient_dict = kwargs.get("patient_dict", [])
     rewards = []
     for completion, patient_json in zip(completions, patient_dict):
         try:
             patient = json.loads(patient_json)
             score = score_simplicity(completion, patient)
             rewards.append(score)
-        except Exception:
+        except Exception as e:
+            print(f"Simplicity Error: {e}")
             rewards.append(0.0)
     return rewards
 
-def reward_tone(completions, patient_dict, **kwargs):
+def reward_tone(prompts, completions, **kwargs):
     """Checks emotional tone match."""
+    patient_dict = kwargs.get("patient_dict", [])
     rewards = []
     for completion, patient_json in zip(completions, patient_dict):
         try:
             patient = json.loads(patient_json)
             score = score_tone(completion, patient)
             rewards.append(score)
-        except Exception:
+        except Exception as e:
+            print(f"Tone Error: {e}")
             rewards.append(0.0)
     return rewards
 
-def reward_language(completions, patient_dict, **kwargs):
+def reward_language(prompts, completions, **kwargs):
     """Checks if model responded in requested language."""
+    patient_dict = kwargs.get("patient_dict", [])
     rewards = []
     for completion, patient_json in zip(completions, patient_dict):
         try:
             patient = json.loads(patient_json)
             score = score_language(completion, patient)
             rewards.append(score)
-        except Exception:
+        except Exception as e:
+            print(f"Language Error: {e}")
             rewards.append(0.0)
     return rewards
 
