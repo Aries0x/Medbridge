@@ -53,6 +53,22 @@ os.environ["WANDB_API_KEY"] = "wandb_v1_K6rMkJAXoQMhzjmFBCIzTouBegw_UeTkeYnXQ2xJ
 wandb.login()
 print("WandB logged in!")
 
+# Set your HuggingFace Space URL (for dataset generation)
+MEDBRIDGE_URL = os.environ.get("MEDBRIDGE_URL", "https://Nermal007-medbridge.hf.space")
+
+# Add current path for local imports
+import sys
+sys.path.insert(0, ".")
+
+# Import local rewards and environment for high-speed training
+try:
+    from medbridge import MedbridgeAction, MedbridgeEnv
+    from medbridge.rewards import score_accuracy, score_simplicity, score_tone, score_language, score_followup
+    print("Successfully imported MedBridge modules for training.")
+except ImportError as e:
+    print(f"Warning: Could not import local medbridge modules: {e}")
+    print("Falling back to remote reward logic (slower).")
+
 # %% [markdown]
 # ## 1. Load Model with Unsloth (4-bit QLoRA)
 
@@ -79,68 +95,39 @@ model = FastLanguageModel.get_peft_model(
     random_state=42,
 )
 
-print(f"Model loaded. Trainable params: {model.print_trainable_parameters()}")
-
 # %% [markdown]
-# ## 2. Connect to MedBridge Environment
-
-# %%  Environment setup
-# Set your HuggingFace Space URL here
-MEDBRIDGE_URL = os.environ.get("MEDBRIDGE_URL", "https://Nermal007-medbridge.hf.space")
-
-# We'll use the OpenEnv client to interact with the environment
-import sys
-sys.path.insert(0, ".")
-
-# For local testing, import directly
-# For remote, install the client: pip install git+https://github.com/YOUR_REPO
-try:
-    from medbridge import MedbridgeAction, MedbridgeEnv
-    print("Using local MedBridge client")
-except ImportError:
-    print("MedBridge client not found locally. Install from HF Space repo.")
-    raise
-
-# %% [markdown]
-# ## 3. Define the Rollout Function
+# ## 2. Generate Training Prompts from Environment
 #
-# This function:
-# 1. Generates prompts from the environment (reset)
-# 2. Gets model completions
-# 3. Sends completions to the environment (step)
-# 4. Returns rewards for GRPO
+# This generates 200 diverse medical scenarios by resetting the MedBridge environment.
+# We store the metadata (patient/report) to use in reward functions later.
 
-# %% Build training dataset from environment
+# %% Build training dataset
 def generate_training_prompts(n_prompts: int = 200) -> Dataset:
-    """
-    Generate training prompts by resetting the MedBridge environment.
-    Each prompt contains a patient scenario that the model must respond to.
-    """
     prompts = []
+    print(f"Connecting to {MEDBRIDGE_URL} to generate {n_prompts} scenarios...")
 
     with MedbridgeEnv(base_url=MEDBRIDGE_URL).sync() as env:
         for i in range(n_prompts):
             result = env.reset()
             obs = result.observation
+            
+            # The observation contains metadata from the server
+            metadata = obs.metadata or {}
+            patient_dict = metadata.get("current_patient", {})
+            report_dict = metadata.get("current_report", {})
 
-            patient = obs.patient_profile
             system_msg = (
                 "You are a compassionate medical communicator in India. "
-                "Your job is to explain medical diagnoses to patients in simple language "
-                "they can understand, in their preferred language, matching their emotional needs."
+                "Explain medical diagnoses simply and empathetically in the patient's language."
             )
 
             user_msg = (
-                f"Patient: {patient.get('name', 'Patient')}, "
-                f"Age: {patient.get('age', 50)}, "
-                f"Language: {patient.get('language', 'Hindi')}, "
-                f"Education: {patient.get('education_level', 'Class 8')}, "
-                f"Emotional state: {patient.get('emotional_label', 'Anxious')}\n\n"
+                f"Patient: {patient_dict.get('name')}, Age: {patient_dict.get('age')}, "
+                f"Language: {patient_dict.get('language')}, "
+                f"Education: {patient_dict.get('education_level')}\n\n"
                 f"Medical Report:\n{obs.medical_report}\n\n"
-                f"Diagnosis: {obs.diagnosis_name} (Severity: {obs.severity})\n\n"
-                f"Please explain this diagnosis to the patient in {patient.get('language', 'Hindi')}. "
-                f"Use simple words appropriate for {patient.get('education_level', 'Class 8')} education level. "
-                f"Be empathetic and match their emotional state."
+                f"Diagnosis: {obs.diagnosis_name}\n\n"
+                f"Please explain this to the patient in {patient_dict.get('language')}."
             )
 
             prompt = tokenizer.apply_chat_template(
@@ -154,22 +141,17 @@ def generate_training_prompts(n_prompts: int = 200) -> Dataset:
 
             prompts.append({
                 "prompt": prompt,
-                "patient_language": patient.get("language", "Hindi"),
-                "diagnosis_name": obs.diagnosis_name,
-                "severity": obs.severity,
+                "patient_dict": json.dumps(patient_dict),
+                "report_dict": json.dumps(report_dict),
             })
 
             if (i + 1) % 50 == 0:
                 print(f"Generated {i+1}/{n_prompts} prompts")
 
-    dataset = Dataset.from_list(prompts)
-    print(f"Dataset created: {len(dataset)} prompts")
-    return dataset
+    return Dataset.from_list(prompts)
 
-# %% Generate dataset
-print("Generating training prompts from MedBridge environment...")
 train_dataset = generate_training_prompts(n_prompts=200)
-print(train_dataset)
+print(f"Created dataset with {len(train_dataset)} prompts")
 
 # %% [markdown]
 # ## 4. Define Reward Functions for GRPO
@@ -177,74 +159,55 @@ print(train_dataset)
 # GRPO uses reward functions to score model completions.
 # We connect to the environment to get the 5-dimensional reward signal.
 
-# %% Reward functions
-def medbridge_reward_accuracy(completions: List[str], **kwargs) -> List[float]:
-    """Score accuracy of medical explanations via MedBridge environment."""
+# %% Metadata-aware Reward Functions
+# These rewards use local imports for speed and metadata for accuracy.
+
+def reward_accuracy(completions, report_dict, **kwargs):
+    """Checks medical accuracy against the CORRECT diagnosis."""
     rewards = []
-    prompts = kwargs.get("prompts", [""] * len(completions))
-
-    with MedbridgeEnv(base_url=MEDBRIDGE_URL).sync() as env:
-        for i, completion in enumerate(completions):
-            try:
-                result = env.reset()
-
-                # Step 1: Send explanation
-                result = env.step(MedbridgeAction(
-                    explanation=completion,
-                    followup_answer=""
-                ))
-
-                # Get accuracy score from partial rewards
-                scores = result.observation.reward_breakdown
-                rewards.append(scores.get("accuracy", 0.0))
-            except Exception as e:
-                rewards.append(0.0)
-
+    for completion, report_json in zip(completions, report_dict):
+        try:
+            report = json.loads(report_json)
+            score = score_accuracy(completion, report)
+            rewards.append(score)
+        except Exception:
+            rewards.append(0.0)
     return rewards
 
-
-def medbridge_reward_simplicity(completions: List[str], **kwargs) -> List[float]:
-    """Score simplicity of explanations."""
+def reward_simplicity(completions, patient_dict, **kwargs):
+    """Checks reading level against patient's target grade."""
     rewards = []
-    with MedbridgeEnv(base_url=MEDBRIDGE_URL).sync() as env:
-        for completion in completions:
-            try:
-                env.reset()
-                result = env.step(MedbridgeAction(explanation=completion, followup_answer=""))
-                scores = result.observation.reward_breakdown
-                rewards.append(scores.get("simplicity", 0.0))
-            except Exception:
-                rewards.append(0.0)
+    for completion, patient_json in zip(completions, patient_dict):
+        try:
+            patient = json.loads(patient_json)
+            score = score_simplicity(completion, patient)
+            rewards.append(score)
+        except Exception:
+            rewards.append(0.0)
     return rewards
 
-
-def medbridge_reward_tone(completions: List[str], **kwargs) -> List[float]:
-    """Score emotional tone."""
+def reward_tone(completions, patient_dict, **kwargs):
+    """Checks emotional tone match."""
     rewards = []
-    with MedbridgeEnv(base_url=MEDBRIDGE_URL).sync() as env:
-        for completion in completions:
-            try:
-                env.reset()
-                result = env.step(MedbridgeAction(explanation=completion, followup_answer=""))
-                scores = result.observation.reward_breakdown
-                rewards.append(scores.get("tone", 0.0))
-            except Exception:
-                rewards.append(0.0)
+    for completion, patient_json in zip(completions, patient_dict):
+        try:
+            patient = json.loads(patient_json)
+            score = score_tone(completion, patient)
+            rewards.append(score)
+        except Exception:
+            rewards.append(0.0)
     return rewards
 
-
-def medbridge_reward_language(completions: List[str], **kwargs) -> List[float]:
-    """Score language correctness."""
+def reward_language(completions, patient_dict, **kwargs):
+    """Checks if model responded in requested language."""
     rewards = []
-    with MedbridgeEnv(base_url=MEDBRIDGE_URL).sync() as env:
-        for completion in completions:
-            try:
-                env.reset()
-                result = env.step(MedbridgeAction(explanation=completion, followup_answer=""))
-                scores = result.observation.reward_breakdown
-                rewards.append(scores.get("language", 0.0))
-            except Exception:
-                rewards.append(0.0)
+    for completion, patient_json in zip(completions, patient_dict):
+        try:
+            patient = json.loads(patient_json)
+            score = score_language(completion, patient)
+            rewards.append(score)
+        except Exception:
+            rewards.append(0.0)
     return rewards
 
 
@@ -311,10 +274,10 @@ trainer = GRPOTrainer(
     tokenizer=tokenizer,
     train_dataset=train_dataset,
     reward_funcs=[
-        medbridge_reward_accuracy,
-        medbridge_reward_simplicity,
-        medbridge_reward_tone,
-        medbridge_reward_language,
+        reward_accuracy,
+        reward_simplicity,
+        reward_tone,
+        reward_language,
     ],
 )
 

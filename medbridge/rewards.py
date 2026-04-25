@@ -12,12 +12,13 @@ from patients import get_reading_grade
 from followups import score_followup_answer
 
 # Load the sentiment analysis model ONCE at module level.
-# Using CPU (device=-1) for compatibility across all machines.
-print("Loading sentiment model... (this may take a moment on first run)")
+import torch
+device = 0 if torch.cuda.is_available() else -1
+print(f"Loading sentiment model on {'GPU' if device == 0 else 'CPU'}...")
 sentiment_analyzer = pipeline(
     "sentiment-analysis",
     model="cardiffnlp/twitter-roberta-base-sentiment-latest",
-    device=-1
+    device=device
 )
 print("Sentiment model loaded successfully.")
 
