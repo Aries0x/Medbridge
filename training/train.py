@@ -24,21 +24,11 @@ Usage:
 # **Hardware**: T4 GPU (16GB VRAM)
 
 # %% Install dependencies
-# # First, uninstall mergekit if it exists from previous runs to avoid pip conflicts
-# !pip uninstall -y mergekit
 # !pip install -q "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"
 # !pip install -q --no-deps "trl>=0.12.0"
 # !pip install -q openenv-core datasets accelerate bitsandbytes wandb "transformers>=4.45.0" peft sentencepiece textstat langdetect
 # !pip install -q git+https://github.com/Aries0x/Medbridge.git
-#
-# # Create a stub mergekit module (TRL imports it but never uses it during GRPO training)
-# import importlib, types
-# if not importlib.util.find_spec("mergekit"):
-#     import sys
-#     mergekit = types.ModuleType("mergekit")
-#     mergekit.__path__ = []
-#     sys.modules["mergekit"] = mergekit
-#     print("Created mergekit stub (not needed for GRPO training)")
+# !pip install -q --upgrade "pydantic>=2.12.0"  # Restore Colab pydantic — eliminates ALL warnings
 
 # %% Imports
 import os
