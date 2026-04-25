@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+*.egg
+dist/
+build/
+.DS_Store
+Thumbs.db
+*.log
+test_http.py
+test_ws.py
+test_remote.py
+check_space.py
+medbridge/uv.lock

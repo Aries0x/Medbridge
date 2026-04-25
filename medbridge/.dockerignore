@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.git/
+.venv/
+test_*.py
+env.py
+_*.txt
+*.pdf
+training/
+demo/
