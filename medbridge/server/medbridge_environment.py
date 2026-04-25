@@ -180,6 +180,10 @@ class MedbridgeEnvironment(Environment):
             episode_phase="awaiting_explanation",
             done=False,
             reward=0.0,
+            metadata={
+                "current_patient": self._current_patient,
+                "current_report": self._current_report,
+            }
         )
 
     def step(
