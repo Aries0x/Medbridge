@@ -28,7 +28,6 @@ Usage:
 # !pip install -q --no-deps "trl>=0.12.0"
 # !pip install -q openenv-core datasets accelerate bitsandbytes wandb "transformers>=4.45.0" peft sentencepiece
 # !pip install -q textstat langdetect  # For local reward calculation
-# !pip install -q "pydantic>=2.10.6,<2.11"  # Pin to avoid mergekit/google-adk conflicts
 # !pip install -q git+https://github.com/Aries0x/Medbridge.git  # MedBridge client + rewards
 
 # %% Imports
