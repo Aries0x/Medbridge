@@ -65,7 +65,8 @@ sys.path.insert(0, ".")
 
 # Import local rewards and environment for high-speed training
 try:
-    from medbridge import MedbridgeAction, MedbridgeEnv
+    from medbridge import MedbridgeAction
+    from medbridge.server.medbridge_environment import MedbridgeEnv
     from medbridge.rewards import score_accuracy, score_simplicity, score_tone, score_language, score_followup
     print("Successfully imported MedBridge modules for training.")
 except ImportError as e:
@@ -106,15 +107,14 @@ model = FastLanguageModel.get_peft_model(
 # %% Build training dataset
 def generate_training_prompts(n_prompts: int = 200) -> Dataset:
     prompts = []
-    print(f"Connecting to {MEDBRIDGE_URL} to generate {n_prompts} scenarios...")
+    print(f"Generating {n_prompts} scenarios locally for blazing fast speed...")
 
-    with MedbridgeEnv(base_url=MEDBRIDGE_URL).sync() as env:
-        for i in range(n_prompts):
-            result = env.reset()
-            obs = result.observation
-            
-            # The observation contains metadata from the server
-            metadata = obs.metadata or {}
+    env = MedbridgeEnv()
+    for i in range(n_prompts):
+        obs = env.reset()
+        
+        # The observation contains metadata from the server
+        metadata = obs.metadata or {}
             patient_dict = metadata.get("current_patient", {})
             report_dict = metadata.get("current_report", {})
 
@@ -225,28 +225,28 @@ def medbridge_reward_combined(completions: List[str], **kwargs) -> List[float]:
     """Combined reward using the full MedBridge 2-step episode."""
     rewards = []
 
-    with MedbridgeEnv(base_url=MEDBRIDGE_URL).sync() as env:
-        for completion in completions:
-            try:
-                env.reset()
+    env = MedbridgeEnv()
+    for completion in completions:
+        try:
+            env.reset()
 
-                # Step 1: Send explanation
-                result = env.step(MedbridgeAction(
-                    explanation=completion,
-                    followup_answer=""
-                ))
+            # Step 1: Send explanation
+            obs = env.step(MedbridgeAction(
+                explanation=completion,
+                followup_answer=""
+            ))
 
-                if result.done:
-                    rewards.append(result.reward or 0.0)
-                    continue
+            if obs.done:
+                rewards.append(obs.reward or 0.0)
+                continue
 
-                # Step 2: Simple follow-up (using part of the explanation)
-                result = env.step(MedbridgeAction(
-                    explanation="",
-                    followup_answer=completion[:200]  # Use truncated explanation as follow-up
-                ))
+            # Step 2: Simple follow-up (using part of the explanation)
+            obs = env.step(MedbridgeAction(
+                explanation="",
+                followup_answer=completion[:200]  # Use truncated explanation as follow-up
+            ))
 
-                rewards.append(result.reward or 0.0)
+            rewards.append(obs.reward or 0.0)
             except Exception:
                 rewards.append(0.0)
 
