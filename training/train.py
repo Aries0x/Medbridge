@@ -37,6 +37,9 @@ import random
 import time
 from typing import List, Dict
 
+# Unsloth must be imported first for optimizations
+from unsloth import FastLanguageModel  # type: ignore[import-not-found]
+
 import torch
 import transformers  # type: ignore[import-not-found]
 
@@ -73,8 +76,7 @@ except ImportError as e:
 # ## 1. Load Model with Unsloth (4-bit QLoRA)
 
 # %% Load model
-from unsloth import FastLanguageModel  # type: ignore[import-not-found]
-
+# FastLanguageModel imported at the top of the file
 model, tokenizer = FastLanguageModel.from_pretrained(
     model_name="unsloth/Qwen2.5-3B-Instruct-bnb-4bit",
     max_seq_length=2048,
