@@ -37,4 +37,3 @@ server = "medbridge.server.app:main"
 [tool.setuptools]
 include-package-data = true
 packages = ["medbridge", "medbridge.server"]
-package-dir = { "medbridge" = ".", "medbridge.server" = "server" }
