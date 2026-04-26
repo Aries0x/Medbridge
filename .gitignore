@@ -9,8 +9,25 @@ build/
 .DS_Store
 Thumbs.db
 *.log
-test_http.py
-test_ws.py
-test_remote.py
-check_space.py
+
+# Large model files (use HF Hub instead)
+base_model/
+*.safetensors
+*.incomplete
+
+# HF cache
+.cache/
+
+# Test files
+test_*.py
+
+# Node modules
+ui/node_modules/
+ui/dist/
+
+# IDE
+.vscode/
+.idea/
+
+# Lock files
 medbridge/uv.lock

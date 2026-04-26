@@ -7,8 +7,12 @@ import textstat
 from langdetect import detect, LangDetectException
 from transformers import pipeline
 
-from .patients import get_reading_grade
-from .followups import score_followup_answer
+try:
+    from .patients import get_reading_grade
+    from .followups import score_followup_answer
+except ImportError:
+    from patients import get_reading_grade  # type: ignore[import-not-found]
+    from followups import score_followup_answer  # type: ignore[import-not-found]
 
 # Load the sentiment analysis model ONCE at module level.
 import torch
